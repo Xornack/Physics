@@ -1,0 +1,100 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Feb  4 19:41:26 2020
+Model radioactive decay of parent-daughter pairs. The functions and methods
+should work with any radioactive isotope, but these two pairs, Mo-Tc and Sr-Ru
+show transient and secular equilibrium well.
+
+There's no calculus here, just rough estimates. Of course, you could get finer
+estimates with better math or by making the time changes very small.
+
+Half-life constants for Mo and Tc-99m are from the National Institute of 
+Standards and Technology (NIST). They provide a chart of radionuclide 
+half-life measurement data. 
+website: https://www.nist.gov/pml/radionuclide-half-life-measurements/radionuclide-half-life-measurements-data
+
+Sr and Rb are from the IAEA.
+website: https://www-nds.iaea.org/relnsd/vcharthtml/VChartHTML.html
+
+@author: gamem
+"""
+
+from math import log as ln
+from math import exp
+import matplotlib.pyplot as plt
+plt.style.use('fivethirtyeight')
+
+# Function that determines activity left at time t. Starting activity is A0.
+# HL is half-life.
+def A(A0, HL, t):
+    return A0*exp(-(ln(2)/HL)*t)
+    
+# Define a class called isotopes, which have activities and half-lives.
+class isotope():
+    def __init__(self, activity, HL):
+        self.activity = activity
+        self.HL = HL
+        
+    # Method that decays the isotope by some time unit t. These units are
+    # agnostic, so you have to make sure they match.
+    # The change activity is specified just so you can use it to add to 
+    # daughter activity.
+    def decay(self, t):
+        self.change_in_activity = self.activity - self.activity*exp(-(ln(2)/self.HL)*t)
+        self.activity = self.activity*exp(-(ln(2)/self.HL)*t)
+        
+    # This is really for daughter activity. If you milk the generator, you're
+    # removing it, basically returning activity to 0.
+    def milk(self):
+        self.activity = 0
+
+# Parent daughter Mo-99 and Tc99m isobars. This shows the activity
+# if you start with 100 (100% dose) of Mo-99. You get a transient equilibrium.
+# There's an optional milk perameter that shows what happens if you milk
+# the generator.
+Mo = isotope(100, 65.9239)
+Tc99m = isotope(0, 6.00718)
+milk = False
+Mo_activities = []
+Tc99m_activities = []
+for i in range(100):
+    print("Activity Mo at", i, "hours:", Mo.activity)
+    print("Activity Tc99m at", i, "hours:", Tc99m.activity)
+    Mo_activities.append(Mo.activity)
+    Tc99m_activities.append(Tc99m.activity)
+    if i % 24 == 0 and milk == True:
+        Tc99m.milk()
+    Mo.decay(1)
+    # Interestingly, the activity of Tc99m is much higher than Mo-99.
+    # How much higher? The quotient of their half-lives.
+    Tc99m.activity = Tc99m.activity + (Mo.HL/Tc99m.HL)*Mo.change_in_activity
+    Tc99m.decay(1)
+
+# Function to draw a graph of the simulated data.
+def show(activities, d_activities, x_label, title):
+    plt.plot(activities)
+    plt.plot(d_activities)
+    plt.xlabel(x_label)
+    plt.ylabel('Activity')
+    plt.title(title)
+    plt.legend(["Parent", "Daughter"], loc = 'best')
+    plt.show()
+    
+show(Mo_activities, Tc99m_activities, "Hours", "Mo-99 --> Tc99m")
+
+# Parent-daughter Sr82 and Ru82 isobars. This sets up a secular equilibrium.
+# There's no milk option here, because it's boring.
+Sr82 = isotope(100, 25.35*24*60*60)
+Rb82 = isotope(0, 1.2575*60)
+Sr_activities = []
+Rb_activities = []
+for i in range(1000):
+    print("Activity Sr82 at", i, "seconds:", Sr82.activity)
+    print("Activity Rb82 at", i, "seconds:", Rb82.activity)
+    Sr_activities.append(Sr82.activity)
+    Rb_activities.append(Rb82.activity)
+    Sr82.decay(1)
+    Rb82.activity = Rb82.activity + (Sr82.HL/Rb82.HL)*Sr82.change_in_activity
+    Rb82.decay(1)
+
+show(Sr_activities, Rb_activities, "Seconds", "Sr-82 --> Rb-82")
